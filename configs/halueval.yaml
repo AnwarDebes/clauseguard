@@ -1,0 +1,11 @@
+## Zero-shot evaluation on HaluEval.
+extends: base.yaml
+
+dataset:
+  name: halueval
+  subsets: [qa, dialogue, summarization]
+  max_samples: 2000
+
+evaluation:
+  primary_metric: auroc
+  binary_labels: true

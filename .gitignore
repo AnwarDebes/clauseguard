@@ -1,0 +1,47 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Virtual envs
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Cached datasets (download via scripts/download_datasets.sh)
+.cache/
+~/.cache/clauseguard/
+
+# Per-run artefacts kept locally only
+results/verifiers/*.pkl
+results/sat_receipts/seed_*/receipts/*.cnf
+results/**/predictions.jsonl
+results/**/recourse.jsonl
+results/**/adversarial.jsonl
+results/**/reports/*.md
+
+# Allow the aggregated paper-ready outputs to be tracked
+!results/clauseguard_5seeds.json
+!results/clauseguard_5seeds.md
+!results/**/summary.json
+
+# Local environment overrides
+.env
+.envrc

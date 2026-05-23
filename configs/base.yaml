@@ -1,0 +1,31 @@
+## Base configuration for ClauseGuard experiments.
+## Override per-experiment in configs/<experiment>.yaml.
+
+graphtm:
+  number_of_clauses: 1000
+  T: 1500
+  s: 10.0
+  depth: 5
+  hypervector_size: 8192
+  hypervector_bits: 2
+  message_size: 256
+  message_bits: 2
+  max_included_literals: 64
+  epochs: 50
+
+dual_graph:
+  emit_entity_alignment: true
+  emit_relation_alignment: true
+  emit_contradiction: true
+  max_nodes: 256
+
+extractor:
+  name: regex      # one of: regex, qwen
+  qwen_model_path: ~/model_archive/Qwen2.5-1.5B-Instruct
+  device: cuda
+
+evaluation:
+  seeds: [42, 123, 456, 789, 1337]
+  max_dev: 5000
+  bootstrap_resamples: 1000
+  confidence: 0.95

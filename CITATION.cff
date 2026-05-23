@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: "ClauseGuard: Interpretable Verification of LLM Outputs via Graph Tsetlin Machines"
+type: software
+authors:
+  - family-names: Anwar
+    affiliation: "University of Agder (UiA)"
+abstract: >
+  A symbolic audit layer that consumes LLM-generated atomic claim triples
+  and a context knowledge graph, and emits per-claim Support/Refute/NEI
+  labels with human-readable Boolean clauses and SAT-verifiable receipts.
+  Targets EU AI Act Article 13 + 14 compliance for any LLM deployment.
+date-released: 2026-05-23
+license: MIT
+keywords:
+  - Tsetlin Machine
+  - Graph Tsetlin Machine
+  - LLM verification
+  - hallucination detection
+  - interpretable AI
+  - EU AI Act
+  - knowledge graph
+  - counterfactual recourse
+  - SAT verification
+  - neuro-symbolic

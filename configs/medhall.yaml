@@ -1,0 +1,11 @@
+## Zero-shot evaluation on MedHallBench.
+extends: base.yaml
+
+dataset:
+  name: medhall
+  max_samples: 2000
+
+evaluation:
+  primary_metric: auroc
+  binary_labels: true
+  context_specialisation: medical

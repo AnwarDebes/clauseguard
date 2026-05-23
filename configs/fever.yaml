@@ -1,0 +1,22 @@
+## Per-experiment override for FEVER training.
+extends: base.yaml
+
+dataset:
+  name: fever
+  split_train: train
+  split_dev: dev
+  max_train: null      # null = full set
+  max_dev: 5000
+
+graphtm:
+  number_of_clauses: 1000
+  T: 1500
+  s: 10.0
+  epochs: 50
+
+evaluation:
+  primary_metric: label_accuracy
+  also_track:
+    - macro_f1
+    - clause_set_size
+    - median_clause_length
