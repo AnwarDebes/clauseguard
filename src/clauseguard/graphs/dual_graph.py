@@ -51,10 +51,35 @@ CROSS_GRAPH_EDGE_TYPES: tuple[str, ...] = (
     "contradict:negation",
 )
 
+# Paper-a (arXiv 2510.XXXXX, subword-dep GraphTM) edge vocabulary. Used
+# only when the optional subword-dep evidence builder is selected; the
+# default builder never emits these symbols. The list is appended at the
+# end of ALL_EDGE_TYPES so the IDs of every existing edge type stay
+# unchanged, which keeps SAT-receipt reproducibility and the default
+# DualGraphBuilder output bit-identical to v0.1.
+SUBWORD_DEP_RELATIONS: tuple[str, ...] = (
+    "nsubj", "obj", "iobj",
+    "amod", "advmod", "compound",
+    "prep", "pobj",
+    "det", "aux",
+    "conj", "cc",
+    "mark", "advcl", "relcl",
+    "ROOT",
+)
+SUBWORD_DEP_EDGE_TYPES: tuple[str, ...] = (
+    "seq_next",
+    "seq_prev",
+) + tuple(f"dep:{r}" for r in SUBWORD_DEP_RELATIONS) + tuple(
+    f"dep:{r}_inv" for r in SUBWORD_DEP_RELATIONS
+)
+
 # Full vocab seen by the GraphTM, in a fixed order. The order is part of
 # the model's interface contract, changing it breaks SAT-receipt
-# reproducibility.
-ALL_EDGE_TYPES: tuple[str, ...] = GRAPH_EDGE_TYPES + CROSS_GRAPH_EDGE_TYPES
+# reproducibility. Subword-dep types are appended after the cross-graph
+# types so existing IDs do not move.
+ALL_EDGE_TYPES: tuple[str, ...] = (
+    GRAPH_EDGE_TYPES + CROSS_GRAPH_EDGE_TYPES + SUBWORD_DEP_EDGE_TYPES
+)
 _EDGE_TYPE_TO_ID = {e: i for i, e in enumerate(ALL_EDGE_TYPES)}
 
 
@@ -116,11 +141,26 @@ class TypedGraph:
 # DualGraphBuilder
 # --------------------------------------------------------------------------
 
+EvidenceBuilderName = str  # one of: "default", "subword_dep"
+
+
 class DualGraphBuilder:
     """Combine a claim graph + evidence graph into a single TypedGraph.
 
     Configuration (set via the constructor) controls which cross-graph
     edge types are emitted. Defaults emit all three.
+
+    The ``evidence_builder`` argument selects the evidence-side graph
+    construction strategy:
+
+    * ``"default"``: the v0.1 entity/relation-triple evidence graph
+      (:func:`clauseguard.graphs.evidence_graph.build_evidence_graph`).
+      Bit-identical to all releases up to v0.1.
+    * ``"subword_dep"``: an alternative evidence-side graph that uses
+      BPE subword tokens as nodes and typed spaCy dependency edges
+      (ported from paper-a). Whether it improves verification accuracy
+      over the default is an open empirical question; the planned
+      5-seed FEVER GPU run will answer it.
     """
 
     def __init__(
@@ -129,11 +169,33 @@ class DualGraphBuilder:
         emit_relation_alignment: bool = True,
         emit_contradiction: bool = True,
         max_nodes: int = 256,
+        evidence_builder: EvidenceBuilderName = "default",
     ) -> None:
         self.emit_entity_alignment = emit_entity_alignment
         self.emit_relation_alignment = emit_relation_alignment
         self.emit_contradiction = emit_contradiction
         self.max_nodes = max_nodes
+        if evidence_builder not in ("default", "subword_dep"):
+            raise ValueError(
+                f"evidence_builder must be 'default' or 'subword_dep', "
+                f"got {evidence_builder!r}"
+            )
+        self.evidence_builder = evidence_builder
+        self._subword_dep_builder = None  # lazy
+
+    def _build_evidence_subgraph(
+        self,
+        evidence_triples: Sequence[Triple],
+    ) -> tuple[tuple[str, ...], list[tuple[int, int, str]], list[int]]:
+        if self.evidence_builder == "default":
+            return build_evidence_graph(evidence_triples)
+        # "subword_dep" path. Import lazily so users on the default path
+        # never pay the spaCy / transformers import cost.
+        if self._subword_dep_builder is None:
+            from ..builders.subword_dep_evidence import SubwordDepEvidenceBuilder
+
+            self._subword_dep_builder = SubwordDepEvidenceBuilder()
+        return self._subword_dep_builder.build(evidence_triples)
 
     # ------------------------------------------------------------------
     # Public API
@@ -145,7 +207,7 @@ class DualGraphBuilder:
     ) -> TypedGraph:
         # 1. Build the two sub-graphs.
         c_labels, c_edges, c_polarity = build_claim_graph(claim_triples)
-        e_labels, e_edges, e_polarity = build_evidence_graph(evidence_triples)
+        e_labels, e_edges, e_polarity = self._build_evidence_subgraph(evidence_triples)
 
         # 2. Re-index the evidence side so its node ids start after the
         #    claim side. This keeps node ids globally unique without

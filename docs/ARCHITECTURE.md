@@ -32,6 +32,7 @@ evidence-graph edit that would have flipped the decision.
 src/clauseguard/
   extraction/    M1  LLM output -> atomic-claim triples
   graphs/        M2  triples -> typed graph + cross-graph edges
+  builders/      M2  pluggable evidence-graph back ends (default, subword_dep)
   tm/            M3  dual-graph walking HGTM + distillation
   recourse/      M4  evidence-graph counterfactual edit search
   verify/        M5  SAT-encode clauses + sign clause receipts
@@ -109,11 +110,48 @@ class DualGraphBuilder:
     """Combines a claim graph and an evidence graph into one TypedGraph
     with cross-graph alignment edges (entity-link, relation-match,
     contradiction-link). The GraphTM treats them as a single typed
-    graph; clauses can reference cross-graph edge types directly."""
+    graph; clauses can reference cross-graph edge types directly.
+
+    The ``evidence_builder`` constructor argument selects the
+    evidence-side back end:
+      * ``"default"``: v0.1 entity-triple evidence graph.
+      * ``"subword_dep"``: BPE subwords + spaCy dep edges (paper-a).
+    Defaults to ``"default"`` so existing callers are unaffected."""
+    def __init__(self, ..., evidence_builder: str = "default"): ...
     def build(self,
               claim_triples: tuple[Triple, ...],
               evidence_triples: tuple[Triple, ...]) -> TypedGraph: ...
 ```
+
+### M2.bis: builders/ (alternative evidence-graph back ends)
+
+```python
+# src/clauseguard/builders/subword_dep_evidence.py
+class SubwordDepEvidenceBuilder:
+    """Subword/dep evidence-graph builder ported from paper-a
+    (arXiv 2510.XXXXX). Nodes are BPE subword tokens of the rendered
+    evidence text; edges are seq_next/seq_prev plus dep:<reltype> and
+    dep:<reltype>_inv for the spaCy dependency relations.
+
+    Public ``build(evidence_triples) -> (node_labels, edges, polarity)``
+    returns the same shape as ``build_evidence_graph`` so
+    ``DualGraphBuilder`` can plug either back end behind the same call
+    site.
+
+    If spaCy or its English model is unavailable the builder falls
+    back to a deterministic mock parser so unit tests still run; the
+    mock is not a useful parser and the fallback is recorded on
+    ``using_mock_spacy``."""
+    def build(self, evidence_triples) -> tuple[tuple[str,...],
+                                               list[tuple[int,int,str]],
+                                               list[int]]: ...
+```
+
+Motivation for the subword-dep back end: finer-grained linguistic
+structure on the evidence side. Whether it actually improves
+verification accuracy is an open empirical question; the planned
+5-seed FEVER GPU run is what answers it, the architecture document
+makes no claim either way until those numbers exist.
 
 ### M3: tm/
 
@@ -262,9 +300,10 @@ Total budget: ~14 GPU-hours per seed, ~70 GPU-hours over 5 seeds.
 | `src/clauseguard/extraction/triple_extractor.py` | claim → (s, r, o) triples | M1 |
 | `src/clauseguard/extraction/qwen_extractor.py` | concrete Qwen2.5-1.5B implementation | M1 |
 | `src/clauseguard/graphs/claim_graph.py` | claim triples → typed graph | M2 |
-| `src/clauseguard/graphs/evidence_graph.py` | evidence triples → typed graph | M2 |
+| `src/clauseguard/graphs/evidence_graph.py` | evidence triples to typed graph (default back end) | M2 |
 | `src/clauseguard/graphs/dual_graph.py` | combine + cross-graph edges | M2 |
 | `src/clauseguard/graphs/binarize.py` | literal binarisation | M2 |
+| `src/clauseguard/builders/subword_dep_evidence.py` | subword/dep evidence back end (paper-a port) | M2 |
 | `src/clauseguard/tm/graphtm_verifier.py` | dual-graph HGTM | M3 |
 | `src/clauseguard/tm/distillation.py` | LLM-judge → TM distillation | M3 |
 | `src/clauseguard/tm/ensemble.py` | K-seed ensembling | M3 |

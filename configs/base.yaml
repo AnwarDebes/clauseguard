@@ -18,6 +18,10 @@ dual_graph:
   emit_relation_alignment: true
   emit_contradiction: true
   max_nodes: 256
+  ## Evidence-graph back end. "default" keeps the v0.1 entity-triple
+  ## evidence graph. "subword_dep" swaps in the paper-a subword/dep
+  ## builder. Default is "default"; existing experiments are unchanged.
+  evidence_builder: default
 
 extractor:
   name: regex      # one of: regex, qwen

@@ -329,6 +329,7 @@ clauseguard/
 ├── src/clauseguard/
 │   ├── extraction/   atomic-claim decomposer + (s, r, o) triple extractor
 │   ├── graphs/       claim graph, evidence graph, dual graph
+│   ├── builders/     pluggable evidence-graph back ends (default, subword_dep)
 │   ├── tm/           graph-walking HGTM verifier + distillation + ensemble
 │   ├── recourse/     candidate gen + greedy minimum-edit search + report
 │   ├── verify/       SAT encoder (Glucose 4) + signed clause receipts
@@ -357,6 +358,36 @@ clauseguard/
 | `paper-c-tm-robustness` | TextAttack adapter + per-sample logger | adversarial stress-test of the audit layer |
 | `decoder-attention-distill-graphtm` | Qwen / LLaMA attention extraction | LLM-side claim decomposition + attention prior |
 | `graphtm-cbr` | graph-walking HGTM + CUDA-C kernels + greedy recourse | the verification engine + the recourse module (repurposed for evidence-graph edits) |
+
+---
+
+## Alternative evidence-graph back end
+
+ClauseGuard ships with two evidence-graph back ends, selectable through
+a single `evidence_builder` toggle in `configs/base.yaml`:
+
+| `evidence_builder` | Node type | Edge types |
+|---|---|---|
+| `default` | one canonical entity per evidence triple | `rel:<canonical_relation>` and inverses |
+| `subword_dep` | BPE subword tokens of the rendered evidence text | `seq_next`, `seq_prev`, `dep:<reltype>`, `dep:<reltype>_inv` |
+
+The `subword_dep` builder is ported from paper-a (arXiv 2510.XXXXX,
+subword-dependency GraphTM). The motivation is finer-grained linguistic
+structure on the evidence side: where the default builder collapses the
+sentence "Drug X treats disease Y" into the single triple
+`(drug_x, treats, disease_y)`, the subword-dep builder keeps the
+sub-token sequence and the dependency tree available to the GraphTM
+clauses.
+
+Whether finer-grained linguistic structure on the evidence side
+actually improves verification accuracy is an open empirical question.
+It will be answered by the planned 5-seed FEVER GPU run; the README
+will be updated with measured numbers once that run completes.
+
+Code lives in `src/clauseguard/builders/subword_dep_evidence.py`. The
+public interface mirrors the default evidence-graph builder, so
+existing callers see no behaviour change while `evidence_builder` is
+left at `default`.
 
 ---
 
