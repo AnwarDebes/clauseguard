@@ -1,8 +1,20 @@
 # ClauseGuard
 
+▶ See this project in the film *Show Its Work*: https://youtu.be/pefnyZ-oCcM?t=1158
+
 > **An auditable safety layer for any LLM.** SAT-verifiable Boolean
 > rules and counterfactual evidence recourse via dual-graph Tsetlin
 > Machines. Built for EU AI Act Article 13/14 compliance.
+
+ClauseGuard is a research prototype for fact-checking what an LLM
+says. It splits the model's answer into (subject, relation, object)
+claims, lines them up against evidence from a knowledge graph or
+retrieved text, and lets a Graph Tsetlin Machine label each claim
+Support, Refute or NotEnoughInfo. Each verdict comes with Boolean
+clauses, a receipt an auditor can re-check with a SAT solver, and, for
+refuted claims, a small evidence edit that would flip the verdict. The
+code and tests are in place, but no model has been trained yet, so
+every number below is a target, not a measurement.
 
 University of Agder (UiA).
 
@@ -36,6 +48,8 @@ University of Agder (UiA).
 | 5-seed FEVER training run | not started, ~1 week V100 |
 | Zero-shot transfer to HaluEval / FActScore / MedHallBench | not started |
 | Adversarial robustness evaluation | not started |
+| Exact per-sample firing clauses | not done: receipts list the top-16 clauses by weight and say so (`firing_extraction = "approximate-top-k"`) |
+| Tests for invariants 3-4 (CUDA-CPU parity, no silent CPU fallback) | not written |
 | Auditor user study (n ≥ 10) | not started |
 | Paper submission | in draft (`PAPER.md`) |
 
@@ -290,8 +304,8 @@ gantt
 ## Quickstart
 
 ```bash
-# 1. Install (editable mode)
-pip install -e .
+# 1. Install (editable mode, Python 3.10+; the dev extra adds pytest)
+pip install -e ".[dev]"
 
 # 2. Run the test suite (no GPU required)
 pytest tests/ -q
@@ -302,16 +316,24 @@ bash scripts/download_datasets.sh
 # 4. Extract triples on a small slice (regex extractor, no GPU)
 python scripts/extract_triples.py --dataset fever --split train --max-samples 5000
 
-# 5. Train the dual-graph GraphTM on FEVER train (one seed)
+# 5. Train the dual-graph GraphTM on FEVER train (one seed; needs an
+#    NVIDIA GPU, GraphTsetlinMachine runs on PyCUDA)
 python experiments/train_fever.py --seed 42 --max-train 10000 --epochs 25
 
-# 6. Run the full 5-seed protocol (matches paper-a / paper-b / paper-c protocol)
+# 6. Run the full 5-seed protocol (matches paper-a / paper-b / paper-c protocol).
+#    The script caps FEVER train at CLAUSEGUARD_MAX_TRAIN (default 10000)
+#    and calls scripts/aggregate_results.py at the end.
 bash scripts/run_all_seeds.sh
-python scripts/aggregate_results.py
 ```
 
 For the production extractor (Qwen2.5-1.5B-Instruct, open weights),
-add `--extractor qwen` to any of the above commands.
+add `--extractor qwen` to steps 4 and 5, or set
+`CLAUSEGUARD_EXTRACTOR=qwen` for step 6. It loads the model from
+`QWEN_TEACHER_DIR` (default `~/model_archive/Qwen2.5-1.5B-Instruct`).
+
+Receipts are signed with HMAC-SHA-256 using the key in
+`CLAUSEGUARD_HMAC_KEY`; without it a built-in dev key is used
+(`src/clauseguard/verify/certificate.py`).
 
 ---
 
